@@ -81,7 +81,11 @@ async def _run_async(
     if len(snaps) < 2:
         console.print("[red]Engine produced fewer than 2 snapshots; cannot compute metrics.[/red]")
         raise typer.Exit(code=1)
-    perf = compute_performance(snaps)
+    cashflows = [
+        (snaps[0].date, -float(initial_capital)),
+        (snaps[-1].date, snaps[-1].portfolio_value),
+    ]
+    perf = compute_performance(snaps, cashflows=cashflows)
     dd = max_drawdown(snaps)
 
     write_run_json(
@@ -109,6 +113,9 @@ async def _run_async(
     summary.add_row("CAGR", f"{perf.cagr * 100:.2f}%")
     summary.add_row("Annualised vol", f"{perf.annualized_volatility * 100:.2f}%")
     summary.add_row("Sharpe", f"{perf.sharpe:.3f}")
+    summary.add_row("Sortino", f"{perf.sortino:.3f}")
+    if perf.xirr is not None:
+        summary.add_row("XIRR", f"{perf.xirr * 100:.2f}%")
     summary.add_row("Max drawdown", f"{dd.max_drawdown * 100:.2f}%")
     summary.add_row("Transactions", str(len(result.portfolio.ledger)))
     summary.add_row("Snapshots", str(len(snaps)))
