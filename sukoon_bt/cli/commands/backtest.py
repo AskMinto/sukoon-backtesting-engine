@@ -22,6 +22,7 @@ from sukoon_bt.data.client import SukoonDataClient
 from sukoon_bt.data.repository import FundRepository
 from sukoon_bt.plugins import collect_strategies
 from sukoon_bt.reporting.csv import write_snapshots_csv, write_transactions_csv
+from sukoon_bt.reporting.html import write_run_html
 from sukoon_bt.reporting.json import write_run_json
 from sukoon_bt.strategies.base import Strategy
 from sukoon_bt.strategies.buy_and_hold import BuyAndHold
@@ -121,6 +122,16 @@ async def _run_async(
     )
     write_transactions_csv(output_dir / "transactions.csv", list(result.portfolio.ledger))
     write_snapshots_csv(output_dir / "snapshots.csv", snaps)
+    write_run_html(
+        output_dir / "report.html",
+        config=cfg,
+        config_hash=cfg_hash,
+        engine_version=__version__,
+        performance=perf,
+        drawdown=dd,
+        snapshots=snaps,
+        transactions=list(result.portfolio.ledger),
+    )
 
     summary = Table(title=cfg.get("name", "sukoon-bt run"))
     summary.add_column("Metric", style="cyan")
