@@ -17,7 +17,7 @@ the regime change and end up holding B.
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date
 from pathlib import Path
 
 import polars as pl

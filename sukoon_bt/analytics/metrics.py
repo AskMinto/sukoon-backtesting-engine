@@ -199,9 +199,9 @@ def _daily_returns(snapshots: list[PortfolioSnapshot]) -> list[float]:
 
 
 __all__ = [
+    "TRADING_DAYS_PER_YEAR",
     "BenchmarkMetrics",
     "PerformanceMetrics",
-    "TRADING_DAYS_PER_YEAR",
     "compute_benchmark_metrics",
     "compute_performance",
     "xirr",

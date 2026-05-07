@@ -6,7 +6,6 @@ runs in offline mode without hitting the network.
 
 from __future__ import annotations
 
-import os
 from datetime import date, timedelta
 from pathlib import Path
 

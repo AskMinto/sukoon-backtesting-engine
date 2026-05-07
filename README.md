@@ -5,7 +5,7 @@
 
 Event-driven mutual fund backtesting CLI for the [Sukoon data API](https://github.com/AskMinto/sukoon-mcp).
 
-> **Status:** Phase 1 (deliverables 1–3 of [the spec](docs/SPEC.md)) — working CLI, MCP/REST data layer with cache, deterministic buy-and-hold backtest. Phase 2 (momentum + full analytics) and Phase 3 (taxes + optimisation + HTML reporting) ship next.
+> **Status:** Phase 2 (deliverables 1–4 of [the spec](docs/SPEC.md)) — working CLI, MCP/REST data layer with cache, deterministic buy-and-hold + momentum backtests, full risk analytics (Sortino, alpha/beta/IR, XIRR, rolling metrics), constraint-aware rebalancing (calendar + drift threshold + min trade size + tolerance), pluggy-based strategy plugins, category-based universe selection. Phase 3 (taxes + optimisation + HTML reporting) ships next.
 
 ## What it does
 
@@ -41,6 +41,8 @@ Set `MINTO_API_URL` to point at a non-default Sukoon API instance (the default i
 
 ## Strategy YAML
 
+Buy-and-hold (simplest):
+
 ```yaml
 name: Buy and Hold
 
@@ -52,11 +54,36 @@ universe:
   funds:
     - "120503"          # Parag Parikh Flexi Cap
 
-allocation:
-  method: equal_weight
-
 rebalance:
   frequency: never      # never | monthly | quarterly | yearly
+
+period:
+  start: 2018-01-01
+  end: 2024-12-31
+```
+
+Top-N momentum over a category-based universe with SIP and threshold rebalancing:
+
+```yaml
+name: Top-3 Flexi-Cap Momentum
+
+capital:
+  initial: 100000
+  sip: 10000
+
+universe:
+  category: "Flexi Cap"
+  limit: 30             # cap search-result count (default 50)
+
+signal:
+  type: momentum
+  params:
+    lookback_days: 180
+    top_n: 3
+
+rebalance:
+  frequency: monthly
+  threshold: 0.10       # also rebalance if any held weight drifts > 10%
 
 benchmark:
   id: "NIFTY 500"
@@ -66,7 +93,7 @@ period:
   end: 2024-12-31
 ```
 
-Phase 1 supports: explicit `universe.funds` lists, equal-weight allocation, periodic rebalancing, optional SIP cashflows. Category-based universes (`universe.category: flexicap`), momentum signals, and threshold rebalancing arrive in Phase 2.
+Built-in `signal.type` values: `equal_weight` (default), `buy_and_hold`, `momentum`. Third-party strategies plug in via [`pluggy`](https://pluggy.readthedocs.io/) — see `sukoon_bt/plugins/__init__.py` for the entry-point contract.
 
 ## Outputs
 

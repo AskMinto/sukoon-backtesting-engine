@@ -1,0 +1,29 @@
+name: Top-3 Flexi-Cap Momentum
+
+capital:
+  initial: 100000
+  sip: 10000
+
+universe:
+  category: "Flexi Cap"
+  limit: 30           # cap how many funds the search returns
+
+signal:
+  type: momentum
+  params:
+    lookback_days: 180
+    top_n: 3
+
+allocation:
+  method: equal_weight
+
+rebalance:
+  frequency: monthly
+  threshold: 0.10     # also rebalance if any held weight drifts > 10%
+
+benchmark:
+  id: "NIFTY 500"
+
+period:
+  start: 2018-01-01
+  end: 2024-12-31

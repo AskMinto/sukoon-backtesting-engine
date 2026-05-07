@@ -84,7 +84,7 @@ def plan_rebalance(
     sells: list[TradeInstruction] = []
     buys: list[TradeInstruction] = []
 
-    for fid, current, target, delta in rows:
+    for fid, _current, _target, delta in rows:
         nav = navs[fid]
         # Tolerance band — skip if drift below tolerance fraction of portfolio.
         if abs(delta) < constraints.tolerance * portfolio_value:

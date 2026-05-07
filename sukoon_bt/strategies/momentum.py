@@ -42,10 +42,10 @@ class Momentum(Strategy):
         self._top_n = top_n
         self._latest_targets: dict[str, float] = {}
 
-    def initialize(self, context: Context) -> None:  # noqa: ARG002
+    def initialize(self, context: Context) -> None:
         self._latest_targets = {}
 
-    def on_day(self, event: Event, context: Context) -> None:  # noqa: ARG002
+    def on_day(self, event: Event, context: Context) -> None:
         # Re-ranking happens lazily inside target_allocations(), so on_day
         # is a no-op here. Kept for symmetry with the Strategy ABC.
         return None

@@ -20,9 +20,9 @@ from sukoon_bt.core.engine import Engine, EngineConfig
 from sukoon_bt.data.cache import CacheBundle
 from sukoon_bt.data.client import SukoonDataClient
 from sukoon_bt.data.repository import FundRepository
+from sukoon_bt.plugins import collect_strategies
 from sukoon_bt.reporting.csv import write_snapshots_csv, write_transactions_csv
 from sukoon_bt.reporting.json import write_run_json
-from sukoon_bt.plugins import collect_strategies
 from sukoon_bt.strategies.base import Strategy
 from sukoon_bt.strategies.buy_and_hold import BuyAndHold
 from sukoon_bt.strategies.momentum import Momentum
@@ -157,7 +157,7 @@ async def _resolve_universe(cfg: dict[str, Any], repo: FundRepository) -> list[s
     category = universe.get("category")
     if category:
         limit = int(universe.get("limit", 50))
-        funds = await repo._client.search_funds(category=str(category), page_size=limit)  # noqa: SLF001
+        funds = await repo._client.search_funds(category=str(category), page_size=limit)
         if not funds:
             raise typer.BadParameter(f"category '{category}' returned 0 funds")
         return [f.id for f in funds]

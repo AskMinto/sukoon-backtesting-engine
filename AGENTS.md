@@ -132,8 +132,8 @@ Co-Authored-By: Claude <noreply@anthropic.com>
 Status as of `main`:
 
 - **Phase 1 ✅** — Skeleton, MCP/REST integration with cache, deterministic buy-and-hold backtest, JSON+CSV reporting, golden tests.
-- **Phase 2 (next)** — Momentum strategy (lookback + top-N ranking), full rebalance constraints (min trade size, exit-load awareness, partial rebalance), full analytics (Sortino, alpha, beta, IR, XIRR), pluggy plugin registry wiring, category-based universe selectors in YAML.
-- **Phase 3** — Tax engine (STCG/LTCG, equity vs debt, pre/post-2023 debt rules), optimisation (grid search), HTML reporting with charts.
+- **Phase 2 ✅** — Momentum strategy (lookback + top-N), full rebalance constraints (min trade, tolerance band, threshold-driven drift rebalance), full analytics (Sortino, alpha/beta/IR/TE, XIRR, rolling CAGR/Sharpe/drawdown), pluggy plugin registry, category-based universe via `search_funds`.
+- **Phase 3 (next)** — Tax engine (STCG/LTCG, equity vs debt, pre/post-2023 debt rules), optimisation (grid search), HTML reporting with charts.
 
 When picking up work in a new phase, read the corresponding spec section and the existing module stubs first. Most module files already exist as empty placeholders matching spec §5.
 

@@ -13,7 +13,9 @@ console = Console()
 
 
 def run(
-    results: Path = typer.Argument(..., exists=True, readable=True, help="Path to run JSON."),
+    results: Path = typer.Argument(  # noqa: B008
+        ..., exists=True, readable=True, help="Path to run JSON."
+    ),
 ) -> None:
     """Render a saved run.json as a rich-formatted summary."""
     payload = orjson.loads(results.read_bytes())

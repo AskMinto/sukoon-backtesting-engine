@@ -133,7 +133,7 @@ class CacheBundle:
         self.benchmark.close()
         self.metadata.close()
 
-    def __enter__(self) -> "CacheBundle":
+    def __enter__(self) -> CacheBundle:
         return self
 
     def __exit__(self, *exc: object) -> None:
@@ -159,10 +159,10 @@ def widen_range(
 
 __all__ = [
     "BENCHMARK_TTL_SECONDS",
-    "CacheBundle",
     "METADATA_TTL_SECONDS",
-    "MetadataCache",
     "NAV_TTL_SECONDS",
+    "CacheBundle",
+    "MetadataCache",
     "TimeSeriesCache",
     "default_cache_dir",
     "widen_range",

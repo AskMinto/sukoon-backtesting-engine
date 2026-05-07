@@ -26,7 +26,7 @@ def _version_callback(value: bool) -> None:
 @app.callback()
 def _root(
     ctx: typer.Context,
-    version: bool = typer.Option(  # noqa: B008 — typer.Option creates the dependency
+    version: bool = typer.Option(
         False,
         "--version",
         help="Print sukoon-bt version and exit.",

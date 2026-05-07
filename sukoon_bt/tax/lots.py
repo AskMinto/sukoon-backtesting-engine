@@ -98,7 +98,7 @@ class TaxLotBook:
         return list(self._lots.get(fund_id, ()))
 
     def total_open_units(self, fund_id: str) -> float:
-        return sum(l.units_remaining for l in self._lots.get(fund_id, ()))
+        return sum(lot.units_remaining for lot in self._lots.get(fund_id, ()))
 
 
 __all__ = ["ConsumedLot", "TaxLotBook"]

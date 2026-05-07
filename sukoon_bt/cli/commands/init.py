@@ -35,14 +35,15 @@ period:
   end: 2024-12-31
 """,
     "momentum": """\
-name: Dual Momentum
+name: Top-3 Flexi-Cap Momentum
 
 capital:
   initial: 100000
   sip: 10000
 
 universe:
-  category: flexicap
+  category: "Flexi Cap"
+  limit: 30
 
 signal:
   type: momentum
@@ -55,20 +56,23 @@ allocation:
 
 rebalance:
   frequency: monthly
+  threshold: 0.10
 
 benchmark:
   id: "NIFTY 500"
 
 period:
-  start: 2015-01-01
-  end: 2025-01-01
+  start: 2018-01-01
+  end: 2024-12-31
 """,
 }
 
 
 def run(
-    template: str = typer.Argument("buy_and_hold", help="Template name (buy_and_hold | momentum)"),
-    output: Path = typer.Option(
+    template: str = typer.Argument(
+        "buy_and_hold", help="Template name (buy_and_hold | momentum)"
+    ),
+    output: Path = typer.Option(  # noqa: B008
         Path("strategy.yaml"), "--output", "-o", help="Output YAML path."
     ),
 ) -> None:

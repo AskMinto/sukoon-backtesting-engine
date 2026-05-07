@@ -34,7 +34,7 @@ class Portfolio:
     _tx_seq: int = 0
 
     @classmethod
-    def with_initial_capital(cls, amount: float) -> "Portfolio":
+    def with_initial_capital(cls, amount: float) -> Portfolio:
         if amount < 0:
             raise ValueError("initial capital must be non-negative")
         return cls(cash=amount, _peak_value=amount)
