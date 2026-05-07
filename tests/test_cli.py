@@ -50,8 +50,9 @@ def test_init_unknown_template(tmp_path: Path) -> None:
     assert result.exit_code == 2
 
 
-def test_backtest_stub_invokes(tmp_path: Path) -> None:
+def test_backtest_rejects_yaml_missing_required_sections(tmp_path: Path) -> None:
+    """Real backtest path; happy-path is exercised in test_cli_backtest.py."""
     cfg = tmp_path / "cfg.yaml"
     cfg.write_text("name: stub\n")
     result = runner.invoke(app, ["backtest", str(cfg)])
-    assert result.exit_code == 0
+    assert result.exit_code != 0

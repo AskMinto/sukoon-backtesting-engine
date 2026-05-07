@@ -222,3 +222,6 @@ __marimo__/
 out/
 *.parquet
 .python-version-local
+
+# Allow committed test fixtures
+!tests/fixtures/*.parquet
