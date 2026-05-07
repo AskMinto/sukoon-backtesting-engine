@@ -49,6 +49,10 @@ class EngineConfig:
     rebalance_frequency: str = "never"  # "never" | "monthly" | "quarterly" | "yearly"
     rebalance_min_trade: float = 100.0
     rebalance_tolerance: float = 0.0
+    # If > 0, the engine fires an additional REBALANCE on any MARKET_OPEN
+    # where the absolute drift of *any* held fund vs. its target weight
+    # exceeds this fraction. spec §10 "threshold rebalancing".
+    rebalance_threshold: float = 0.0
 
     def to_scheduler(self) -> SchedulerConfig:
         return SchedulerConfig(
@@ -118,6 +122,8 @@ class Engine:
 
             if event.type is EventType.MARKET_OPEN:
                 self._strategy.on_day(event, ctx)
+                if self._config.rebalance_threshold > 0 and self._drift_exceeds_threshold(ctx):
+                    self._rebalance_to(self._strategy.target_allocations(ctx), d)
 
             elif event.type is EventType.SIP_TRIGGER and isinstance(event, CashflowEvent):
                 self._apply_sip(event)
@@ -131,6 +137,21 @@ class Engine:
         return EngineResult(portfolio=self._portfolio, trading_days=self._trading_days)
 
     # ----- internals ----------------------------------------------------
+
+    def _drift_exceeds_threshold(self, ctx: Context) -> bool:
+        targets = self._strategy.target_allocations(ctx)
+        if not targets:
+            return False
+        navs = self._last_nav
+        portfolio_value = self._portfolio.total_value(navs)
+        if portfolio_value <= 0:
+            return False
+        for fid, weight in targets.items():
+            current = self._portfolio.holdings.get(fid).market_value(navs.get(fid))
+            current_weight = current / portfolio_value
+            if abs(current_weight - weight) >= self._config.rebalance_threshold:
+                return True
+        return False
 
     def _refresh_navs(self, d: date) -> None:
         for fid, idx in self._nav_index.items():
