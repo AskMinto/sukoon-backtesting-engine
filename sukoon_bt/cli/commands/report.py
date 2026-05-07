@@ -13,7 +13,9 @@ console = Console()
 
 
 def run(
-    results: Path = typer.Argument(..., exists=True, readable=True, help="Path to run JSON."),
+    results: Path = typer.Argument(  # noqa: B008
+        ..., exists=True, readable=True, help="Path to run JSON."
+    ),
 ) -> None:
     """Render a saved run.json as a rich-formatted summary."""
     payload = orjson.loads(results.read_bytes())
@@ -33,6 +35,9 @@ def run(
     summary.add_row("CAGR", _pct(perf.get("cagr")))
     summary.add_row("Annualised vol", _pct(perf.get("annualized_volatility")))
     summary.add_row("Sharpe", _num(perf.get("sharpe")))
+    summary.add_row("Sortino", _num(perf.get("sortino")))
+    if perf.get("xirr") is not None:
+        summary.add_row("XIRR", _pct(perf.get("xirr")))
     summary.add_row("Max drawdown", _pct(dd.get("max_drawdown")))
     if dd.get("peak_date") and dd.get("trough_date"):
         summary.add_row(

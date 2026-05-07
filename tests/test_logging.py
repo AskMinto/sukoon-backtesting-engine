@@ -8,7 +8,7 @@ from io import StringIO
 import orjson
 import pytest
 
-from sukoon_bt.utils.logging import JsonFormatter, LOGGER_NAME, configure, get_logger
+from sukoon_bt.utils.logging import LOGGER_NAME, JsonFormatter, configure, get_logger
 
 
 @pytest.fixture(autouse=True)

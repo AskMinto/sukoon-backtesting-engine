@@ -20,9 +20,12 @@ from sukoon_bt.core.engine import Engine, EngineConfig
 from sukoon_bt.data.cache import CacheBundle
 from sukoon_bt.data.client import SukoonDataClient
 from sukoon_bt.data.repository import FundRepository
+from sukoon_bt.plugins import collect_strategies
 from sukoon_bt.reporting.csv import write_snapshots_csv, write_transactions_csv
 from sukoon_bt.reporting.json import write_run_json
+from sukoon_bt.strategies.base import Strategy
 from sukoon_bt.strategies.buy_and_hold import BuyAndHold
+from sukoon_bt.strategies.momentum import Momentum
 from sukoon_bt.utils.hashing import hash_config
 
 console = Console()
@@ -52,12 +55,20 @@ async def _run_async(
 ) -> None:
     period_start = _as_date(cfg["period"]["start"])
     period_end = _as_date(cfg["period"]["end"])
-    fund_ids = _resolve_universe(cfg)
     initial_capital = float(cfg["capital"]["initial"])
     sip_amount = float(cfg["capital"].get("sip", 0.0))
-    rebalance_frequency = str(cfg.get("rebalance", {}).get("frequency", "never"))
+    rebalance_cfg = cfg.get("rebalance", {})
+    rebalance_frequency = str(rebalance_cfg.get("frequency", "never"))
+    rebalance_threshold = float(rebalance_cfg.get("threshold", 0.0))
 
-    nav_history = await _load_nav_history(fund_ids, period_start, period_end, offline)
+    with CacheBundle() as cache:
+        async with SukoonDataClient() as client:
+            repo = FundRepository(client=client, cache=cache, offline=offline)
+            fund_ids = await _resolve_universe(cfg, repo)
+            nav_history: dict[str, pl.DataFrame] = {}
+            for fid in fund_ids:
+                nav_history[fid] = await repo.nav(fid, period_start, period_end)
+
     if not nav_history or all(df.is_empty() for df in nav_history.values()):
         console.print(
             "[red]No NAV data available for the configured universe + period.[/red] "
@@ -65,7 +76,7 @@ async def _run_async(
         )
         raise typer.Exit(code=1)
 
-    strategy = BuyAndHold(fund_ids=fund_ids)
+    strategy = _build_strategy(cfg, fund_ids)
     engine = Engine(
         strategy=strategy,
         nav_history=nav_history,
@@ -73,6 +84,7 @@ async def _run_async(
             initial_capital=initial_capital,
             sip_amount=sip_amount,
             rebalance_frequency=rebalance_frequency,
+            rebalance_threshold=rebalance_threshold,
         ),
     )
     result = engine.run()
@@ -81,7 +93,11 @@ async def _run_async(
     if len(snaps) < 2:
         console.print("[red]Engine produced fewer than 2 snapshots; cannot compute metrics.[/red]")
         raise typer.Exit(code=1)
-    perf = compute_performance(snaps)
+    cashflows = [
+        (snaps[0].date, -float(initial_capital)),
+        (snaps[-1].date, snaps[-1].portfolio_value),
+    ]
+    perf = compute_performance(snaps, cashflows=cashflows)
     dd = max_drawdown(snaps)
 
     write_run_json(
@@ -102,6 +118,8 @@ async def _run_async(
     summary.add_column("Value", style="green")
     summary.add_row("Engine version", __version__)
     summary.add_row("Config hash", cfg_hash)
+    summary.add_row("Strategy", type(strategy).__name__)
+    summary.add_row("Universe size", str(len(fund_ids)))
     summary.add_row("Period", f"{perf.start_date} → {perf.end_date}")
     summary.add_row("Initial value", f"₹{perf.initial_value:,.2f}")
     summary.add_row("Final value", f"₹{perf.final_value:,.2f}")
@@ -109,6 +127,9 @@ async def _run_async(
     summary.add_row("CAGR", f"{perf.cagr * 100:.2f}%")
     summary.add_row("Annualised vol", f"{perf.annualized_volatility * 100:.2f}%")
     summary.add_row("Sharpe", f"{perf.sharpe:.3f}")
+    summary.add_row("Sortino", f"{perf.sortino:.3f}")
+    if perf.xirr is not None:
+        summary.add_row("XIRR", f"{perf.xirr * 100:.2f}%")
     summary.add_row("Max drawdown", f"{dd.max_drawdown * 100:.2f}%")
     summary.add_row("Transactions", str(len(result.portfolio.ledger)))
     summary.add_row("Snapshots", str(len(snaps)))
@@ -126,36 +147,55 @@ def _load_config(path: Path) -> dict[str, Any]:
     return payload
 
 
-def _resolve_universe(cfg: dict[str, Any]) -> list[str]:
+async def _resolve_universe(cfg: dict[str, Any], repo: FundRepository) -> list[str]:
     universe = cfg.get("universe", {})
-    funds = universe.get("funds")
-    if not funds:
-        raise typer.BadParameter(
-            "Phase 1 only supports an explicit universe.funds list. "
-            "Category-based universes ship in Phase 2."
-        )
-    return [str(f) for f in funds]
+    if not isinstance(universe, dict):
+        raise typer.BadParameter("'universe' must be a mapping")
+    explicit = universe.get("funds")
+    if explicit:
+        return [str(f) for f in explicit]
+    category = universe.get("category")
+    if category:
+        limit = int(universe.get("limit", 50))
+        funds = await repo._client.search_funds(category=str(category), page_size=limit)
+        if not funds:
+            raise typer.BadParameter(f"category '{category}' returned 0 funds")
+        return [f.id for f in funds]
+    raise typer.BadParameter(
+        "universe must declare either 'funds: [list]' or 'category: <name>'"
+    )
+
+
+def _build_strategy(cfg: dict[str, Any], fund_ids: list[str]) -> Strategy:
+    signal = cfg.get("signal", {}) or {}
+    signal_type = str(signal.get("type", "equal_weight")).lower()
+    if signal_type in {"equal_weight", "buy_and_hold"}:
+        return BuyAndHold(fund_ids=fund_ids)
+    if signal_type == "momentum":
+        params = signal.get("params", {}) or {}
+        lookback = int(params.get("lookback_days", 180))
+        top_n = int(params.get("top_n", 3))
+        return Momentum(universe=fund_ids, lookback_days=lookback, top_n=top_n)
+    plugin_strategies = collect_strategies()
+    if signal_type in plugin_strategies:
+        cls = plugin_strategies[signal_type]
+        params = signal.get("params", {}) or {}
+        try:
+            return cls(universe=fund_ids, **params)
+        except TypeError:
+            # Fallback for plugins that take a different constructor shape.
+            return cls(fund_ids, **params)
+    raise typer.BadParameter(
+        f"unknown signal.type '{signal_type}'. "
+        f"Built-in: equal_weight, momentum. "
+        f"Plugin: {sorted(plugin_strategies)}"
+    )
 
 
 def _as_date(value: Any) -> date:
     if isinstance(value, date):
         return value
     return date.fromisoformat(str(value))
-
-
-async def _load_nav_history(
-    fund_ids: list[str],
-    start: date,
-    end: date,
-    offline: bool,
-) -> dict[str, pl.DataFrame]:
-    with CacheBundle() as cache:
-        async with SukoonDataClient() as client:
-            repo = FundRepository(client=client, cache=cache, offline=offline)
-            out: dict[str, pl.DataFrame] = {}
-            for fid in fund_ids:
-                out[fid] = await repo.nav(fid, start, end)
-            return out
 
 
 __all__ = ["run"]

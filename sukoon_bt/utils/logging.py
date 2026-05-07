@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import orjson
@@ -30,7 +30,7 @@ _RESERVED_LOGRECORD_KEYS = frozenset(
 class JsonFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         payload: dict[str, Any] = {
-            "ts": datetime.fromtimestamp(record.created, tz=timezone.utc).isoformat(),
+            "ts": datetime.fromtimestamp(record.created, tz=UTC).isoformat(),
             "level": record.levelname,
             "logger": record.name,
             "msg": record.getMessage(),
@@ -62,4 +62,4 @@ def get_logger(name: str | None = None) -> logging.Logger:
     return logging.getLogger(LOGGER_NAME if name is None else f"{LOGGER_NAME}.{name}")
 
 
-__all__ = ["JsonFormatter", "LOGGER_NAME", "configure", "get_logger"]
+__all__ = ["LOGGER_NAME", "JsonFormatter", "configure", "get_logger"]

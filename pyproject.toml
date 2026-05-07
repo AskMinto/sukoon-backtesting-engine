@@ -67,6 +67,12 @@ target-version = "py312"
 select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]
 ignore = ["E501"]
 
+[tool.ruff.lint.per-file-ignores]
+# Tests intentionally use blind pytest.raises(Exception) when verifying that
+# typer.BadParameter (which inherits from click.exceptions.UsageError) gets
+# raised — different typer versions emit different concrete subtypes.
+"tests/*" = ["B017"]
+
 [tool.ruff.format]
 quote-style = "double"
 

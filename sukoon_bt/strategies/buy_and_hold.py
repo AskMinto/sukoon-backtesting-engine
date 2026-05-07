@@ -38,16 +38,16 @@ class BuyAndHold(Strategy):
             fid: w / total for fid, w in zip(fund_ids, weights, strict=True)
         }
 
-    def initialize(self, context: Context) -> None:  # noqa: ARG002
+    def initialize(self, context: Context) -> None:
         return None
 
-    def on_day(self, event: Event, context: Context) -> None:  # noqa: ARG002
+    def on_day(self, event: Event, context: Context) -> None:
         return None
 
-    def generate_signals(self, context: Context) -> dict[str, float]:  # noqa: ARG002
+    def generate_signals(self, context: Context) -> dict[str, float]:
         return dict(self._targets)
 
-    def target_allocations(self, context: Context) -> dict[str, float]:  # noqa: ARG002
+    def target_allocations(self, context: Context) -> dict[str, float]:
         return dict(self._targets)
 
 
