@@ -22,6 +22,7 @@ from sukoon_bt.data.client import SukoonDataClient
 from sukoon_bt.data.repository import FundRepository
 from sukoon_bt.reporting.csv import write_snapshots_csv, write_transactions_csv
 from sukoon_bt.reporting.json import write_run_json
+from sukoon_bt.plugins import collect_strategies
 from sukoon_bt.strategies.base import Strategy
 from sukoon_bt.strategies.buy_and_hold import BuyAndHold
 from sukoon_bt.strategies.momentum import Momentum
@@ -175,8 +176,19 @@ def _build_strategy(cfg: dict[str, Any], fund_ids: list[str]) -> Strategy:
         lookback = int(params.get("lookback_days", 180))
         top_n = int(params.get("top_n", 3))
         return Momentum(universe=fund_ids, lookback_days=lookback, top_n=top_n)
+    plugin_strategies = collect_strategies()
+    if signal_type in plugin_strategies:
+        cls = plugin_strategies[signal_type]
+        params = signal.get("params", {}) or {}
+        try:
+            return cls(universe=fund_ids, **params)
+        except TypeError:
+            # Fallback for plugins that take a different constructor shape.
+            return cls(fund_ids, **params)
     raise typer.BadParameter(
-        f"unknown signal.type '{signal_type}'. Supported: equal_weight, momentum."
+        f"unknown signal.type '{signal_type}'. "
+        f"Built-in: equal_weight, momentum. "
+        f"Plugin: {sorted(plugin_strategies)}"
     )
 
 
