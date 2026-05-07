@@ -1,0 +1,25 @@
+name: Buy and Hold
+
+capital:
+  initial: 100000
+  sip: 0
+
+universe:
+  funds:
+    - "120503"  # Parag Parikh Flexi Cap
+
+signal:
+  type: equal_weight
+
+allocation:
+  method: equal_weight
+
+rebalance:
+  frequency: never
+
+benchmark:
+  id: "NIFTY 500"
+
+period:
+  start: 2018-01-01
+  end: 2024-12-31
