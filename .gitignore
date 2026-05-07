@@ -216,3 +216,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# sukoon-bt
+.sukoon_bt/
+out/
+*.parquet
+.python-version-local
