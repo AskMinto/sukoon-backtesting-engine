@@ -30,12 +30,12 @@ from sukoon_bt.core.context import Context, MarketState
 from sukoon_bt.core.events import CashflowEvent, EventType, RebalanceEvent
 from sukoon_bt.core.scheduler import SchedulerConfig, schedule
 from sukoon_bt.data.models import TransactionType
+from sukoon_bt.execution.rebalance import RebalanceConstraints, plan_rebalance
 from sukoon_bt.portfolio.portfolio import Portfolio
 from sukoon_bt.strategies.base import Strategy
 
 # Minimum trade amount to avoid noisy micro-rebalances; spec §11 mentions
-# "minimum transaction size" as a rebalance constraint. We default to ₹1
-# which is conservative — strategies can override via config later.
+# "minimum transaction size" as a rebalance constraint.
 MIN_TRADE_AMOUNT = 1.0
 
 
@@ -47,12 +47,20 @@ class EngineConfig:
     sip_amount: float = 0.0
     sip_day: int | None = None
     rebalance_frequency: str = "never"  # "never" | "monthly" | "quarterly" | "yearly"
+    rebalance_min_trade: float = 100.0
+    rebalance_tolerance: float = 0.0
 
     def to_scheduler(self) -> SchedulerConfig:
         return SchedulerConfig(
             sip_amount=self.sip_amount,
             sip_day=self.sip_day,
             rebalance_frequency=self.rebalance_frequency,  # type: ignore[arg-type]
+        )
+
+    def to_constraints(self) -> RebalanceConstraints:
+        return RebalanceConstraints(
+            min_trade_amount=self.rebalance_min_trade,
+            tolerance=self.rebalance_tolerance,
         )
 
 
@@ -170,42 +178,25 @@ class Engine:
         if not targets:
             return
         navs = dict(self._last_nav)
-        portfolio_value = self._portfolio.total_value(navs)
-        if portfolio_value <= 0:
-            return
-        # Compute target value per fund and current market value per fund.
-        current_values: dict[str, float] = {
-            h.fund_id: h.market_value(navs.get(h.fund_id))
-            for h in self._portfolio.holdings
-            if h.units > 0
-        }
-        target_values: dict[str, float] = {
-            fid: weight * portfolio_value for fid, weight in targets.items()
-        }
-
-        # Sells first (free up cash), then buys.
-        for fid, current in current_values.items():
-            target = target_values.get(fid, 0.0)
-            delta_value = target - current
-            if delta_value < -MIN_TRADE_AMOUNT:
-                nav = navs.get(fid)
-                if nav is None or nav <= 0:
-                    continue
-                units_to_sell = min(-delta_value / nav, self._portfolio.holdings.units(fid))
-                if units_to_sell * nav < MIN_TRADE_AMOUNT:
-                    continue
-                self._portfolio.sell(on=on, fund_id=fid, units=units_to_sell, nav=nav)
-
-        for fid, target in target_values.items():
-            current = self._portfolio.holdings.get(fid).market_value(navs.get(fid))
-            delta_value = target - current
-            if delta_value > MIN_TRADE_AMOUNT and self._portfolio.cash > MIN_TRADE_AMOUNT:
-                spend = min(delta_value, self._portfolio.cash)
-                nav = navs.get(fid)
-                if nav is None or nav <= 0:
-                    continue
+        instructions = plan_rebalance(
+            holdings=self._portfolio.holdings,
+            targets=targets,
+            cash=self._portfolio.cash,
+            navs=navs,
+            constraints=self._config.to_constraints(),
+        )
+        for trade in instructions:
+            if trade.action == "SELL":
+                self._portfolio.sell(
+                    on=on, fund_id=trade.fund_id, units=trade.units, nav=trade.nav
+                )
+            else:
                 self._portfolio.buy(
-                    on=on, fund_id=fid, amount=spend, nav=nav, kind=TransactionType.BUY
+                    on=on,
+                    fund_id=trade.fund_id,
+                    amount=trade.amount,
+                    nav=trade.nav,
+                    kind=TransactionType.BUY,
                 )
 
 
