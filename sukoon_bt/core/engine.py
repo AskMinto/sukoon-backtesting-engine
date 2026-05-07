@@ -29,10 +29,12 @@ import polars as pl
 from sukoon_bt.core.context import Context, MarketState
 from sukoon_bt.core.events import CashflowEvent, EventType, RebalanceEvent
 from sukoon_bt.core.scheduler import SchedulerConfig, schedule
-from sukoon_bt.data.models import TransactionType
+from sukoon_bt.data.models import Fund, TransactionType
 from sukoon_bt.execution.rebalance import RebalanceConstraints, plan_rebalance
 from sukoon_bt.portfolio.portfolio import Portfolio
 from sukoon_bt.strategies.base import Strategy
+from sukoon_bt.tax.engine import TaxEngine
+from sukoon_bt.tax.lots import ConsumedLot
 
 # Minimum trade amount to avoid noisy micro-rebalances; spec §11 mentions
 # "minimum transaction size" as a rebalance constraint.
@@ -83,12 +85,26 @@ class Engine:
         strategy: Strategy,
         nav_history: dict[str, pl.DataFrame],
         config: EngineConfig,
+        funds: dict[str, Fund] | None = None,
+        tax_engine: TaxEngine | None = None,
     ) -> None:
         if not nav_history:
             raise ValueError("nav_history must not be empty")
         self._strategy = strategy
         self._nav_history = nav_history
         self._config = config
+        self._funds = funds or {}
+        # Tax engine is optional — when None, sells book taxes=0
+        # (matches Phase 1/2 behaviour). When fund metadata is supplied
+        # but no engine, default to the Indian engine for Phase-3
+        # production runs.
+        self._tax_engine: TaxEngine | None
+        if tax_engine is not None:
+            self._tax_engine = tax_engine
+        elif funds:
+            self._tax_engine = TaxEngine()
+        else:
+            self._tax_engine = None
         self._portfolio = Portfolio.with_initial_capital(config.initial_capital)
         # NAV lookup: per fund_id -> {date: nav}
         self._nav_index: dict[str, dict[date, float]] = {
@@ -209,16 +225,40 @@ class Engine:
         for trade in instructions:
             if trade.action == "SELL":
                 self._portfolio.sell(
-                    on=on, fund_id=trade.fund_id, units=trade.units, nav=trade.nav
+                    on=on,
+                    fund_id=trade.fund_id,
+                    units=trade.units,
+                    nav=trade.nav,
+                    tax_callback=self._tax_callback_for(trade.fund_id),
                 )
             else:
+                # Re-cap buy amount to actual available cash. The planner's
+                # estimate is gross of taxes; sells in this batch may have
+                # netted less than expected, so honour the cash floor.
+                amount = min(trade.amount, self._portfolio.cash)
+                if amount < self._config.rebalance_min_trade:
+                    continue
                 self._portfolio.buy(
                     on=on,
                     fund_id=trade.fund_id,
-                    amount=trade.amount,
+                    amount=amount,
                     nav=trade.nav,
                     kind=TransactionType.BUY,
                 )
+
+    def _tax_callback_for(self, fund_id: str):
+        """Return a tax-callback bound to ``fund_id``, or None if disabled."""
+        if self._tax_engine is None:
+            return None
+        fund = self._funds.get(fund_id)
+        if fund is None:
+            return None
+        engine = self._tax_engine
+
+        def _callback(consumed: list[ConsumedLot]) -> float:
+            return engine.calculate_tax(consumed, fund).total_tax
+
+        return _callback
 
 
 __all__ = ["Engine", "EngineConfig", "EngineResult"]

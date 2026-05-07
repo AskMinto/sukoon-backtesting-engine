@@ -61,6 +61,7 @@ async def _run_async(
     rebalance_frequency = str(rebalance_cfg.get("frequency", "never"))
     rebalance_threshold = float(rebalance_cfg.get("threshold", 0.0))
 
+    funds: dict[str, object] = {}
     with CacheBundle() as cache:
         async with SukoonDataClient() as client:
             repo = FundRepository(client=client, cache=cache, offline=offline)
@@ -68,6 +69,13 @@ async def _run_async(
             nav_history: dict[str, pl.DataFrame] = {}
             for fid in fund_ids:
                 nav_history[fid] = await repo.nav(fid, period_start, period_end)
+                # Fund metadata is required for tax classification but is
+                # tolerant of partial failure — we degrade to "no tax" if
+                # metadata is unavailable in offline mode.
+                try:
+                    funds[fid] = await repo.fund(fid)
+                except Exception:
+                    pass
 
     if not nav_history or all(df.is_empty() for df in nav_history.values()):
         console.print(
@@ -80,6 +88,7 @@ async def _run_async(
     engine = Engine(
         strategy=strategy,
         nav_history=nav_history,
+        funds=funds or None,  # type: ignore[arg-type]
         config=EngineConfig(
             initial_capital=initial_capital,
             sip_amount=sip_amount,
