@@ -114,7 +114,7 @@ period: { start: 2024-01-02, end: 2024-03-29 }
         assert (out / "leaderboard.csv").exists()
         assert (out / "leaderboard.json").exists()
         rows = orjson.loads((out / "leaderboard.json").read_bytes())
-        # 2 thresholds × 2 capitals = 4 combos.
+        # 2 thresholds * 2 capitals = 4 combos.
         assert len(rows) == 4
         # Each row has the swept keys and the metrics.
         assert {"rebalance.threshold", "capital.initial", "cagr", "config_hash"}.issubset(

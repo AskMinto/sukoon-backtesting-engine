@@ -5,8 +5,6 @@ from __future__ import annotations
 from datetime import date, timedelta
 from pathlib import Path
 
-import pytest
-
 from sukoon_bt.analytics.drawdown import max_drawdown
 from sukoon_bt.analytics.metrics import compute_performance
 from sukoon_bt.data.models import PortfolioSnapshot, Transaction, TransactionType

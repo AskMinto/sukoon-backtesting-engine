@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from datetime import date
 from pathlib import Path
 from typing import Any
@@ -98,10 +99,8 @@ async def _backtest(cfg: dict[str, Any], repo: FundRepository) -> dict[str, Any]
     funds: dict[str, object] = {}
     for fid in fund_ids:
         nav_history[fid] = await repo.nav(fid, period_start, period_end)
-        try:
+        with contextlib.suppress(Exception):
             funds[fid] = await repo.fund(fid)
-        except Exception:
-            pass
 
     initial_capital = float(cfg["capital"]["initial"])
     sip_amount = float(cfg["capital"].get("sip", 0.0))

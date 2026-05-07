@@ -15,6 +15,7 @@ Usage::
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import copy
 import itertools
 from datetime import date
@@ -144,10 +145,8 @@ async def _run_sweep(
             fund_ids = await _resolve_universe(base_cfg, repo)
             for fid in fund_ids:
                 nav_history[fid] = await repo.nav(fid, period_start, period_end)
-                try:
+                with contextlib.suppress(Exception):
                     funds[fid] = await repo.fund(fid)
-                except Exception:
-                    pass
 
     rows: list[dict[str, Any]] = []
     for combo in combos:

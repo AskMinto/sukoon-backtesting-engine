@@ -13,10 +13,10 @@ Designers can replace the inline CSS without touching the data layer.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import asdict, is_dataclass
-from datetime import date
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 from sukoon_bt.analytics.drawdown import DrawdownStats
 from sukoon_bt.analytics.metrics import PerformanceMetrics

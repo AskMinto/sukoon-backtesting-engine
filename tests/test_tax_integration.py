@@ -75,11 +75,7 @@ def test_short_term_sell_books_stcg_tax() -> None:
     sell = sells[0]
     # Tax must be > 0 (we sold A at a gain after 0.5%/d for ~40 trading days).
     assert sell.taxes > 0
-    # The cash credited should be (units * nav) - taxes - fees.
-    expected_proceeds = sell.amount - sell.taxes
-    # Cash before sell: initial purchase consumed all capital. After sell + fees(0):
-    # cash should equal expected_proceeds - subsequent buy. Rather than reverse-
-    # engineering, just assert Transaction.taxes is populated and consistent.
+    # Closed-form: STCG @ 15% on the gain (sell_amount - cost_basis = sell_amount - 100k).
     assert sell.taxes == pytest.approx(0.15 * (sell.amount - 100_000.0), rel=0.01)
 
 

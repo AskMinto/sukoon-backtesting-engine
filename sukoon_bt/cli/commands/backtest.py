@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from datetime import date
 from pathlib import Path
 from typing import Any
@@ -73,10 +74,8 @@ async def _run_async(
                 # Fund metadata is required for tax classification but is
                 # tolerant of partial failure — we degrade to "no tax" if
                 # metadata is unavailable in offline mode.
-                try:
+                with contextlib.suppress(Exception):
                     funds[fid] = await repo.fund(fid)
-                except Exception:
-                    pass
 
     if not nav_history or all(df.is_empty() for df in nav_history.values()):
         console.print(
