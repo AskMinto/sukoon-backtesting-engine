@@ -5,7 +5,7 @@
 
 Event-driven mutual fund backtesting CLI for the [Sukoon data API](https://github.com/AskMinto/sukoon-mcp).
 
-> **Status:** Phase 2 (deliverables 1–4 of [the spec](docs/SPEC.md)) — working CLI, MCP/REST data layer with cache, deterministic buy-and-hold + momentum backtests, full risk analytics (Sortino, alpha/beta/IR, XIRR, rolling metrics), constraint-aware rebalancing (calendar + drift threshold + min trade size + tolerance), pluggy-based strategy plugins, category-based universe selection. Phase 3 (taxes + optimisation + HTML reporting) ships next.
+> **Status:** **MVP complete (Phases 1-3)** of [the spec](docs/SPEC.md) — buy-and-hold + momentum backtests; full risk analytics (Sortino, alpha/beta/IR, XIRR, rolling); constraint-aware rebalancing (calendar + drift threshold); Indian capital-gains tax engine (STCG/LTCG, equity vs debt, pre/post-2023 debt rules, FY exemption tracking); grid-search optimisation; head-to-head compare; single-file HTML reports.
 
 ## What it does
 
@@ -27,14 +27,23 @@ Python 3.12+ is required.
 ## Quickstart
 
 ```bash
-# 1. Scaffold a strategy YAML.
+# Scaffold a strategy YAML.
 sukoon-bt init buy_and_hold -o strategy.yaml
 
-# 2. Run the backtest. Outputs CSV + JSON to ./out/.
+# Run the backtest. Outputs run.json + snapshots.csv + transactions.csv + report.html to ./out/.
 sukoon-bt backtest strategy.yaml
 
-# 3. Re-render the saved JSON as a rich-formatted summary.
+# Re-render the saved JSON as a rich-formatted summary.
 sukoon-bt report out/run.json
+
+# Head-to-head comparison.
+sukoon-bt compare a.yaml b.yaml
+
+# Grid-search parameter sweep — leaderboard CSV/JSON in ./out/sweep/.
+sukoon-bt optimize momentum.yaml \
+    --param signal.params.lookback_days=30,60,90,180 \
+    --param signal.params.top_n=2,3,5 \
+    --rank sharpe
 ```
 
 Set `MINTO_API_URL` to point at a non-default Sukoon API instance (the default is `https://api.minto.app`). Pass `--offline` to force cache-only reads.
@@ -104,6 +113,18 @@ Every run writes to `<output-dir>/`:
 | `run.json` | Engine version, config + config hash (sha256), performance metrics, drawdown stats, snapshots, full transaction ledger. |
 | `snapshots.csv` | Daily `{date, portfolio_value, cash, holdings_value, drawdown}`. |
 | `transactions.csv` | Every booked `{id, date, fund_id, type, units, nav, amount, fees, taxes}`. |
+| `report.html` | Self-contained HTML report with SVG charts (portfolio value, drawdown), metrics panel, and transactions table. Zero JS, opens offline. |
+
+## Indian taxes
+
+Sells are taxed automatically when fund metadata is available:
+
+- **Equity** (Flexi Cap, Large Cap, ELSS, etc.): STCG 15% on holdings < 365 days; LTCG 10% on holdings ≥ 365 days with ₹1L exemption per fiscal year.
+- **Debt** (Liquid, Gilt, Corporate Bond, etc.):
+  - Pre-2023 lots (purchase < 2023-04-01): STCG at slab rate, LTCG 20% with optional indexation.
+  - Post-2023 lots: all gains slab-taxed regardless of holding period.
+
+Slab rate and indexation factor are configurable on the `TaxEngine`. The Indian fiscal year exemption is tracked across multiple sales in the same year automatically.
 
 Two runs of the same config against the same data produce a byte-identical `config_hash` and identical numerical outputs (spec §22 determinism).
 

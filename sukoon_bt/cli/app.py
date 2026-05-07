@@ -6,7 +6,9 @@ import typer
 
 from sukoon_bt import __version__
 from sukoon_bt.cli.commands import backtest as backtest_cmd
+from sukoon_bt.cli.commands import compare as compare_cmd
 from sukoon_bt.cli.commands import init as init_cmd
+from sukoon_bt.cli.commands import optimize as optimize_cmd
 from sukoon_bt.cli.commands import report as report_cmd
 
 app = typer.Typer(
@@ -41,7 +43,9 @@ def _root(
 
 
 app.command("backtest")(backtest_cmd.run)
+app.command("compare")(compare_cmd.run)
 app.command("init")(init_cmd.run)
+app.command("optimize")(optimize_cmd.run)
 app.command("report")(report_cmd.run)
 
 

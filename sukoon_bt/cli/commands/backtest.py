@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from datetime import date
 from pathlib import Path
 from typing import Any
@@ -22,6 +23,7 @@ from sukoon_bt.data.client import SukoonDataClient
 from sukoon_bt.data.repository import FundRepository
 from sukoon_bt.plugins import collect_strategies
 from sukoon_bt.reporting.csv import write_snapshots_csv, write_transactions_csv
+from sukoon_bt.reporting.html import write_run_html
 from sukoon_bt.reporting.json import write_run_json
 from sukoon_bt.strategies.base import Strategy
 from sukoon_bt.strategies.buy_and_hold import BuyAndHold
@@ -61,6 +63,7 @@ async def _run_async(
     rebalance_frequency = str(rebalance_cfg.get("frequency", "never"))
     rebalance_threshold = float(rebalance_cfg.get("threshold", 0.0))
 
+    funds: dict[str, object] = {}
     with CacheBundle() as cache:
         async with SukoonDataClient() as client:
             repo = FundRepository(client=client, cache=cache, offline=offline)
@@ -68,6 +71,11 @@ async def _run_async(
             nav_history: dict[str, pl.DataFrame] = {}
             for fid in fund_ids:
                 nav_history[fid] = await repo.nav(fid, period_start, period_end)
+                # Fund metadata is required for tax classification but is
+                # tolerant of partial failure — we degrade to "no tax" if
+                # metadata is unavailable in offline mode.
+                with contextlib.suppress(Exception):
+                    funds[fid] = await repo.fund(fid)
 
     if not nav_history or all(df.is_empty() for df in nav_history.values()):
         console.print(
@@ -80,6 +88,7 @@ async def _run_async(
     engine = Engine(
         strategy=strategy,
         nav_history=nav_history,
+        funds=funds or None,  # type: ignore[arg-type]
         config=EngineConfig(
             initial_capital=initial_capital,
             sip_amount=sip_amount,
@@ -112,6 +121,16 @@ async def _run_async(
     )
     write_transactions_csv(output_dir / "transactions.csv", list(result.portfolio.ledger))
     write_snapshots_csv(output_dir / "snapshots.csv", snaps)
+    write_run_html(
+        output_dir / "report.html",
+        config=cfg,
+        config_hash=cfg_hash,
+        engine_version=__version__,
+        performance=perf,
+        drawdown=dd,
+        snapshots=snaps,
+        transactions=list(result.portfolio.ledger),
+    )
 
     summary = Table(title=cfg.get("name", "sukoon-bt run"))
     summary.add_column("Metric", style="cyan")

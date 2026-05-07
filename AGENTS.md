@@ -133,9 +133,9 @@ Status as of `main`:
 
 - **Phase 1 ✅** — Skeleton, MCP/REST integration with cache, deterministic buy-and-hold backtest, JSON+CSV reporting, golden tests.
 - **Phase 2 ✅** — Momentum strategy (lookback + top-N), full rebalance constraints (min trade, tolerance band, threshold-driven drift rebalance), full analytics (Sortino, alpha/beta/IR/TE, XIRR, rolling CAGR/Sharpe/drawdown), pluggy plugin registry, category-based universe via `search_funds`.
-- **Phase 3 (next)** — Tax engine (STCG/LTCG, equity vs debt, pre/post-2023 debt rules), optimisation (grid search), HTML reporting with charts.
+- **Phase 3 ✅** — Indian tax engine (STCG/LTCG with FY exemption tracking, equity vs debt classification, pre/post-2023 debt rules with optional indexation), tax-on-sale wired into the engine + ledger, `sukoon-bt optimize` grid search, `sukoon-bt compare` head-to-head, single-file HTML reports with hand-rolled SVG charts.
 
-When picking up work in a new phase, read the corresponding spec section and the existing module stubs first. Most module files already exist as empty placeholders matching spec §5.
+The MVP (spec §29 Definition of Done) is complete. Future expansions per spec §30 — ETFs/stocks, live execution, AI-generated strategies, distributed backtesting, browser dashboard — go in new feature branches.
 
 ---
 

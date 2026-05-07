@@ -8,6 +8,7 @@ move in lockstep — strategies must not mutate any of these directly.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date
 
@@ -19,6 +20,8 @@ from sukoon_bt.data.models import (
 from sukoon_bt.portfolio.holdings import HoldingsBook
 from sukoon_bt.portfolio.transactions import TransactionLedger, make_id
 from sukoon_bt.tax.lots import ConsumedLot, TaxLotBook
+
+TaxCallback = Callable[[list[ConsumedLot]], float]
 
 
 @dataclass(slots=True)
@@ -88,8 +91,15 @@ class Portfolio:
         kind: TransactionType = TransactionType.SELL,
         fees: float = 0.0,
         taxes: float = 0.0,
+        tax_callback: TaxCallback | None = None,
     ) -> tuple[Transaction, list[ConsumedLot]]:
-        """Sell ``units`` of ``fund_id``; returns the booked tx and FIFO slices."""
+        """Sell ``units`` of ``fund_id``; returns the booked tx and FIFO slices.
+
+        If ``tax_callback`` is provided, it is invoked with the consumed
+        FIFO slices and the returned amount is used as the booked tax
+        (overriding any explicit ``taxes`` argument). The callback runs
+        after lot consumption so it sees actual holding-period dates.
+        """
         if kind not in {TransactionType.SELL, TransactionType.SWP}:
             raise ValueError(f"sell() called with non-sell kind {kind!r}")
         if units <= 0:
@@ -98,6 +108,8 @@ class Portfolio:
             raise ValueError("sell nav must be positive")
         consumed = self.lots.consume_fifo(fund_id, units, nav, on)
         self.holdings.get(fund_id).remove_units(units, nav)
+        if tax_callback is not None:
+            taxes = float(tax_callback(consumed))
         proceeds = units * nav - fees - taxes
         self.cash += proceeds
         tx = Transaction(
